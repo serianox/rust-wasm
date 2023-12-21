@@ -1,0 +1,787 @@
+<!DOCTYPE html>
+<!-- saved from url=(0045)https://surma.dev/things/rust-to-webassembly/ -->
+<html class="forcedark"><head><meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<meta name="viewport" content="minimum-scale=1, width=device-width">
+<meta name="theme-color" content="#f7f0c2">
+<meta property="og:url" content="https://surma.dev/things/rust-to-webassembly/">
+
+<meta property="og:title" content="Rust to WebAssembly the hard way — surma.dev">
+<meta name="twitter:title" content="Rust to WebAssembly the hard way — surma.dev">
+<title>Rust to WebAssembly the hard way — surma.dev</title>
+
+<meta property="og:type" content="article">
+
+<meta property="og:image" content="https://surma.dev/things/rust-to-webassembly/social.jpg">
+<meta name="twitter:card" content="summary_large_image">
+<meta name="twitter:image" content="https://surma.dev/things/rust-to-webassembly/social.jpg">
+ 
+<meta property="og:description" content="What follows is a brain dump of everything I know about compiling Rust to WebAssembly. Enjoy.">
+<meta name="twitter:description" content="What follows is a brain dump of everything I know about compiling Rust to WebAssembly. Enjoy.">
+
+<script>
+  document.write(
+    `
+    <script type="importmap">
+      {
+        "imports": {
+          "lit1.3.0/": "/node_modules/lit1.3.0/"
+        }
+      }
+    <${'/'}script>
+  `
+  );
+</script>
+    <script type="importmap">
+      {
+        "imports": {
+          "lit1.3.0/": "/node_modules/lit1.3.0/"
+        }
+      }
+    </script>
+  
+
+<style>
+  /* Workaround for https://github.com/parcel-bundler/parcel/issues/5475 */
+
+  .social_twitter {
+    --mask: url(/assets/twitter.23dae7fa.svg);
+  }
+
+  .social_mastodon {
+    --mask: url(/assets/mastodon.893423fb.svg);
+  }
+
+  .social_github {
+    --mask: url(/assets/github.8987d880.svg);
+  }
+
+  .social_instagram {
+    --mask: url(/assets/instagram.42c5046a.svg);
+  }
+
+  .social_keybase {
+    --mask: url(/assets/keybase.4eed6b6b.svg);
+  }
+
+  .social_podcast {
+    --mask: url(/assets/podcast.ed6a7925.svg);
+  }
+
+  .social_rss {
+    --mask: url(/assets/rss.181beed1.svg);
+  }
+
+</style>
+<meta name="twitter:site" content="@DasSurma">
+<link rel="canonical" href="https://surma.dev/things/rust-to-webassembly/">
+<link href="https://surma.dev/index.xml" type="application/atom+xml" rel="alternate" title="Sitewide Atom feed">
+<style media="screen">
+  :root{
+    
+      --darkblue: rgb(10, 49, 68);
+    
+      --blue: rgb(3, 83, 99);
+    
+      --lightblue: rgb(12, 105, 121);
+    
+      --purple: rgb(142, 96, 117);
+    
+      --pink: rgb(191, 85, 105);
+    
+      --red: rgb(218, 59, 59);
+    
+      --orange: rgb(207, 121, 100);
+    
+      --yellow: rgb(247, 240, 194);
+    
+      --white: rgb(251, 248, 228);
+    
+      --diff-green: hsl(122, 61%, 87%);
+    
+      --diff-red: hsl(0, 86%, 27%);
+    
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      
+        --white: rgb(47, 43, 69);
+      
+        --yellow: rgb(25, 23, 37);
+      
+        --orange: rgb(32, 45, 98);
+      
+        --red: rgb(38, 57, 125);
+      
+        --pink: rgb(62, 63, 163);
+      
+        --purple: rgb(128, 65, 200);
+      
+        --lightblue: rgb(183, 86, 184);
+      
+        --blue: rgb(184, 111, 170);
+      
+        --darkblue: rgb(206, 166, 186);
+      
+        --diff-green: hsl(122, 23%, 22%);
+      
+        --diff-red: hsl(0, 64%, 22%);
+      
+    }
+  }
+  html.forcelight {
+    
+      --darkblue: rgb(10, 49, 68);
+    
+      --blue: rgb(3, 83, 99);
+    
+      --lightblue: rgb(12, 105, 121);
+    
+      --purple: rgb(142, 96, 117);
+    
+      --pink: rgb(191, 85, 105);
+    
+      --red: rgb(218, 59, 59);
+    
+      --orange: rgb(207, 121, 100);
+    
+      --yellow: rgb(247, 240, 194);
+    
+      --white: rgb(251, 248, 228);
+    
+      --diff-green: hsl(122, 61%, 87%);
+    
+      --diff-red: hsl(0, 86%, 27%);
+    
+  }
+  html.forcedark {
+    
+      --white: rgb(47, 43, 69);
+    
+      --yellow: rgb(25, 23, 37);
+    
+      --orange: rgb(32, 45, 98);
+    
+      --red: rgb(38, 57, 125);
+    
+      --pink: rgb(62, 63, 163);
+    
+      --purple: rgb(128, 65, 200);
+    
+      --lightblue: rgb(183, 86, 184);
+    
+      --blue: rgb(184, 111, 170);
+    
+      --darkblue: rgb(206, 166, 186);
+    
+      --diff-green: hsl(122, 23%, 22%);
+    
+      --diff-red: hsl(0, 64%, 22%);
+    
+  }
+</style>
+<style media="print">
+  :root{
+    
+      --darkblue: rgb(10, 49, 68);
+    
+      --blue: rgb(3, 83, 99);
+    
+      --lightblue: rgb(12, 105, 121);
+    
+      --purple: rgb(142, 96, 117);
+    
+      --pink: rgb(191, 85, 105);
+    
+      --red: rgb(218, 59, 59);
+    
+      --orange: rgb(207, 121, 100);
+    
+      --yellow: rgb(247, 240, 194);
+    
+      --white: rgb(251, 248, 228);
+    
+      --diff-green: hsl(122, 61%, 87%);
+    
+      --diff-red: hsl(0, 86%, 27%);
+    
+  }
+</style>
+
+<!-- <link rel="stylesheet" href="/styles-print.css" media="print" /> -->
+<link rel="icon" href="./Rust to WebAssembly the hard way — surma.dev_files/surma.1bdb48ee.jpg">
+<link rel="apple-touch-icon-precomposed" href="./Rust to WebAssembly the hard way — surma.dev_files/surma.1bdb48ee.jpg">
+<link rel="me" href="mailto:surma@surma.dev">
+
+
+
+<noscript>
+  <link rel="stylesheet" href="/syntax.css" />
+  <link rel="stylesheet" href="/katex/styles.css" />
+</noscript>
+  <script type="module" crossorigin="" src="./Rust to WebAssembly the hard way — surma.dev_files/index.html.7bc19604.js.download"></script>
+  <link rel="modulepreload" crossorigin="" href="https://surma.dev/assets/modulepreload-polyfill.b7f2da20.js">
+  <link rel="modulepreload" crossorigin="" href="https://surma.dev/assets/noise.942789b8.js">
+  <link rel="stylesheet" href="./Rust to WebAssembly the hard way — surma.dev_files/noise.9b6c2389.css">
+<script src="chrome-extension://nngceckbapebfimnlniiiahkandclblb/content/fido2/page-script.js"></script></head><body>
+
+<header>
+  
+  <a href="https://surma.dev/" class="back">← Back to home</a>
+  
+  <h1>
+    
+     Rust to WebAssembly the hard way  
+  </h1>
+  
+  <time datetime="2023-02-13">
+    2023-02-13
+  </time>
+  
+  <div class="arrows">
+    <div class="arrow darkblue"></div>
+    <div class="arrow blue"></div>
+    <div class="arrow lightblue"></div>
+    <div class="arrow purple"></div>
+    <div class="arrow pink"></div>
+    <div class="arrow red"></div>
+    <div class="arrow orange"></div>
+  </div>
+<button class="darkmode-toggle">Toggle dark mode</button></header>
+<main lang="en">
+    
+  <p>What follows is a brain dump of everything I know about compiling Rust to WebAssembly. Enjoy.</p>
+<!-- more -->
+<p>Some time ago, I wrote a blog post on <a href="https://surma.dev/things/c-to-webassembly">how to compile C to WebAssembly without Emscripten</a>, i.e. without the default tool that makes that process easy. In Rust, the tool that makes WebAssembly easy is called <a href="https://rustwasm.github.io/wasm-bindgen/">wasm-bindgen</a>, and we are going to ditch it! At the same time, Rust is a bit different in that WebAssembly has been a first-class target for a long time and the standard library is laid out to support it out of the box.</p>
+<h2>Rust to WebAssembly 101</h2>
+<p>Let’s see how we can get Rust to emit WebAssembly with as little deviation from the standard Rust workflow as possible. If you look around The Internet, a lot of articles and guides tell you to create a Rust library project with <code>cargo init --lib</code> and add this line to your <code>Cargo.toml</code>:</p>
+<pre><code><span class="diff same"><span class="token punctuation">[</span><span class="token table class-name">package</span><span class="token punctuation">]</span>
+<span class="token key property">name</span> <span class="token punctuation">=</span> <span class="token string">"my_project"</span>
+<span class="token key property">version</span> <span class="token punctuation">=</span> <span class="token string">"0.1.0"</span>
+<span class="token key property">edition</span> <span class="token punctuation">=</span> <span class="token string">"2021"</span>
+</span>
+<span class="diff added"><span class="token punctuation">[</span><span class="token table class-name">lib</span><span class="token punctuation">]</span>
+<span class="token key property">crate-type</span> <span class="token punctuation">=</span> <span class="token punctuation">[</span><span class="token string">"cdylib"</span><span class="token punctuation">]</span></span>
+<span class="diff same">   
+<span class="token punctuation">[</span><span class="token table class-name">dependencies</span><span class="token punctuation">]</span></span></code></pre><p>Without setting the crate type to <code>cdylib</code>, the Rust compiler would emit a <code>.rlib</code> file, which is Rust’s own library format. While the name <code>cdylib</code> implies a dynamic library that is C-compatible, I suspect it really just stands for “use the interoperable format”, or something to that effect.</p>
+<p>For now, we’ll work with the default/example function that Cargo generates when creating a new library:</p>
+<pre><code class="language-rust"><span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">add</span><span class="token punctuation">(</span>left<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">,</span> right<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">usize</span> <span class="token punctuation">{</span>
+    left <span class="token operator">+</span> right
+<span class="token punctuation">}</span>
+</code></pre>
+<p>With all that in place, we can now compile this library to WebAssembly:</p>
+<pre><code>$ cargo build --target=wasm32-unknown-unknown --release
+</code></pre>
+<p>You’ll find a freshly generated WebAssembly module in <code>target/wasm32-unknown-unknown/release/my_project.wasm</code>. I’ll continue to use <code>--release</code> builds throughout this article as it makes the WebAssembly module a lot more readable when we disassemble it.</p>
+<h3>Executable vs library</h3>
+<p>You don’t have to create a library, you can also create a Rust executable (via <code>cargo init --bin</code>). Note, however, that you either have to have a <code>main()</code> function with the well-stablished signature, or you have to shut the compiler up using <code>#![no_main]</code> to let it know that the absence of a <code>main()</code> is intentional.</p>
+<p>Is that better? It seems like a question of taste to me, as both approaches seem to be functionally equivalent and generate the same WebAssembly code. Most of the time, WebAssembly modules seem to be taking the role of a library more than the role of an executable (except in the context of <a href="https://wasi.dev/">WASI</a> — more on that later!), so the library approach seems semantically preferable to me. Unless noted otherwise, I’ll be using the library setup for the remainder of this article.</p>
+<h3>Exporting</h3>
+<p>Continuing with the library-style setup, let’s take a look at the WebAssembly code that the compiler generates. For that purpose, I recommend the <a href="https://github.com/WebAssembly/wabt">WebAssembly Binary Toolkit</a> (“wabt” for short), which provides helpful tools like <code>wasm2wat</code>. While you are at it, also make sure you have <a href="https://github.com/WebAssembly/binaryen">binaryen</a> installed, as we need <code>wasm-opt</code> later in this article. Binaryen also provides <code>wasm-dis</code>, which serves a similar purpose to <code>wasm2wat</code>, but does not emit WebAssembly Text Format (WAT). It emits the less-standardized WebAssembly S-Expression Text Format (WAST). Lastly, there is <a href="https://github.com/bytecodealliance/wasm-tools">wasm-tools</a> by the ByteCodeAlliance which provides <code>wasm-tools print</code>.</p>
+<pre><code>$ wasm2wat ./target/wasm32-unknown-unknown/release/my_project.wasm
+</code></pre>
+<p>This command will convert a WebAssembly binary to WAT:</p>
+<pre><code class="language-wasm"><span class="token punctuation">(</span><span class="token keyword">module</span>
+  <span class="token punctuation">(</span><span class="token keyword">table</span> <span class="token comment">(;0;)</span> <span class="token number">1</span> <span class="token number">1</span> funcref<span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">memory</span> <span class="token comment">(;0;)</span> <span class="token number">16</span><span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">global</span> <span class="token variable">$__stack_pointer</span> <span class="token punctuation">(</span><span class="token keyword">mut</span> <span class="token keyword">i32</span><span class="token punctuation">)</span> <span class="token punctuation">(</span><span class="token keyword">i32<span class="token punctuation">.</span>const</span> <span class="token number">1048576</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">global</span> <span class="token comment">(;1;)</span> <span class="token keyword">i32</span> <span class="token punctuation">(</span><span class="token keyword">i32<span class="token punctuation">.</span>const</span> <span class="token number">1048576</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">global</span> <span class="token comment">(;2;)</span> <span class="token keyword">i32</span> <span class="token punctuation">(</span><span class="token keyword">i32<span class="token punctuation">.</span>const</span> <span class="token number">1048576</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">export</span> <span class="token string">"memory"</span> <span class="token punctuation">(</span><span class="token keyword">memory</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">export</span> <span class="token string">"__data_end"</span> <span class="token punctuation">(</span><span class="token keyword">global</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">export</span> <span class="token string">"__heap_base"</span> <span class="token punctuation">(</span><span class="token keyword">global</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+</code></pre>
+<p>It is with outrage that we discover that our <code>add</code> function has been completely removed from the binary. All we are left with is a stack pointer, and two globals designating where the data section ends and the heap starts. Turns out declaring a function as <code>pub</code> is <em>not</em> enough to get it to show up in our final WebAssembly module. I kinda wish it were enough, but I suspect <code>pub</code> is exclusive about Rust module visibility, not about linker-level symbol visibility.</p>
+<p>The quickest way to make sure the compiler does not remove a function we care about is to add the <code>#[no_mangle]</code> attribute, although I am not a fan of the naming.</p>
+<pre><code><span class="diff added"><span class="token attribute attr-name">#[no_mangle]</span></span>
+<span class="diff same"><span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">add</span><span class="token punctuation">(</span>left<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">,</span> right<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">usize</span> <span class="token punctuation">{</span>
+    left <span class="token operator">+</span> right
+<span class="token punctuation">}</span></span></code></pre><p>It is rarely necessary, but you can export a function with a different name than its Rust-internal name by using <code>#[export_name = "..."]</code>.</p>
+<p>Having marked our <code>add</code> function as an export, we can compile the project again and inspect the resulting WebAssembly file:</p>
+<pre><code><span class="diff same"><span class="token punctuation">(</span><span class="token keyword">module</span></span>
+<span class="diff added">  <span class="token punctuation">(</span><span class="token keyword">type</span> <span class="token comment">(;0;)</span> <span class="token punctuation">(</span><span class="token keyword">func</span> <span class="token punctuation">(</span><span class="token keyword">param</span> <span class="token keyword">i32</span> <span class="token keyword">i32</span><span class="token punctuation">)</span> <span class="token punctuation">(</span><span class="token keyword">result</span> <span class="token keyword">i32</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">func</span> <span class="token variable">$add</span> <span class="token punctuation">(</span><span class="token keyword">type</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">(</span><span class="token keyword">param</span> <span class="token keyword">i32</span> <span class="token keyword">i32</span><span class="token punctuation">)</span> <span class="token punctuation">(</span><span class="token keyword">result</span> <span class="token keyword">i32</span><span class="token punctuation">)</span>
+    <span class="token keyword">local</span>.get <span class="token number">1</span>
+    <span class="token keyword">local</span>.get <span class="token number">0</span>
+    <span class="token keyword">i32<span class="token punctuation">.</span>add</span><span class="token punctuation">)</span></span>
+<span class="diff same">  <span class="token punctuation">(</span><span class="token keyword">table</span> <span class="token comment">(;0;)</span> <span class="token number">1</span> <span class="token number">1</span> funcref<span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">memory</span> <span class="token comment">(;0;)</span> <span class="token number">16</span><span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">global</span> <span class="token variable">$__stack_pointer</span> <span class="token punctuation">(</span><span class="token keyword">mut</span> <span class="token keyword">i32</span><span class="token punctuation">)</span> <span class="token punctuation">(</span><span class="token keyword">i32<span class="token punctuation">.</span>const</span> <span class="token number">1048576</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">global</span> <span class="token comment">(;1;)</span> <span class="token keyword">i32</span> <span class="token punctuation">(</span><span class="token keyword">i32<span class="token punctuation">.</span>const</span> <span class="token number">1048576</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">global</span> <span class="token comment">(;2;)</span> <span class="token keyword">i32</span> <span class="token punctuation">(</span><span class="token keyword">i32<span class="token punctuation">.</span>const</span> <span class="token number">1048576</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">export</span> <span class="token string">"memory"</span> <span class="token punctuation">(</span><span class="token keyword">memory</span> <span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">)</span></span>
+<span class="diff added">  <span class="token punctuation">(</span><span class="token keyword">export</span> <span class="token string">"add"</span> <span class="token punctuation">(</span><span class="token keyword">func</span> <span class="token variable">$add</span><span class="token punctuation">)</span><span class="token punctuation">)</span></span>
+<span class="diff same">  <span class="token punctuation">(</span><span class="token keyword">export</span> <span class="token string">"__data_end"</span> <span class="token punctuation">(</span><span class="token keyword">global</span> <span class="token number">1</span><span class="token punctuation">)</span><span class="token punctuation">)</span>
+  <span class="token punctuation">(</span><span class="token keyword">export</span> <span class="token string">"__heap_base"</span> <span class="token punctuation">(</span><span class="token keyword">global</span> <span class="token number">2</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">)</span></span></code></pre><p>This module can be instantiated with the vanilla WebAssembly APIs:</p>
+<pre><code class="language-js"><span class="token keyword">const</span> importObj <span class="token operator">=</span> <span class="token punctuation">{</span><span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+<span class="token comment">// Node</span>
+<span class="token keyword">const</span> data <span class="token operator">=</span> <span class="token function">require</span><span class="token punctuation">(</span><span class="token string">"fs"</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">readFileSync</span><span class="token punctuation">(</span><span class="token string">"./my_project.wasm"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> <span class="token punctuation">{</span>instance<span class="token punctuation">}</span> <span class="token operator">=</span> <span class="token keyword">await</span> WebAssembly<span class="token punctuation">.</span><span class="token function">instantiate</span><span class="token punctuation">(</span>data<span class="token punctuation">,</span> importObj<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// Deno</span>
+<span class="token keyword">const</span> data <span class="token operator">=</span> <span class="token keyword">await</span> Deno<span class="token punctuation">.</span><span class="token function">readFile</span><span class="token punctuation">(</span><span class="token string">"./my_project.wasm"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> <span class="token punctuation">{</span>instance<span class="token punctuation">}</span> <span class="token operator">=</span> <span class="token keyword">await</span> WebAssembly<span class="token punctuation">.</span><span class="token function">instantiate</span><span class="token punctuation">(</span>data<span class="token punctuation">,</span> importObj<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+<span class="token comment">// For Web, it’s advisable to use `instantiateStreaming` whenever possible:</span>
+<span class="token keyword">const</span> response <span class="token operator">=</span> <span class="token keyword">await</span> <span class="token function">fetch</span><span class="token punctuation">(</span><span class="token string">"./my_project.wasm"</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+<span class="token keyword">const</span> <span class="token punctuation">{</span>instance<span class="token punctuation">}</span> <span class="token operator">=</span> 
+  <span class="token keyword">await</span> WebAssembly<span class="token punctuation">.</span><span class="token function">instantiateStreaming</span><span class="token punctuation">(</span>response<span class="token punctuation">,</span> importObj<span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+instance<span class="token punctuation">.</span>exports<span class="token punctuation">.</span><span class="token function">add</span><span class="token punctuation">(</span><span class="token number">40</span><span class="token punctuation">,</span> <span class="token number">2</span><span class="token punctuation">)</span> <span class="token comment">// returns 42</span>
+</code></pre>
+<p>And suddenly, we have pretty much all the power of Rust at our fingertips to write WebAssembly.</p>
+<p>Special care needs to be taken with functions at the module boundary (i.e. the ones you call from JavaScript). At least for now, it’s best to stick to types that map cleanly to <a href="https://webassembly.github.io/spec/core/syntax/types.html#number-types">WebAssembly types</a> (like <code>i32</code> or <code>f64</code>). If you use higher-level types like arrays, slices, or even owned types like <code>String</code>, the function might end up with more parameters than they have in Rust and generally requires a deeper understanding of memory layout and similar principles.</p>
+<h3>ABIs</h3>
+<p>On that note: Yes, we are successfully compiling Rust to WebAssembly. However, in the version of Rust <em>might</em> emit a WebAssembly module with completely different function signatures. The way function parameters are passed from caller to callee (e.g. as a pointer to a memory or as an immediate value) is part of the Application Binary Interface definition, or “ABI” for short. <code>rustc</code> uses Rust’s ABI by default, which is not stable and mostly consider a Rust internal.</p>
+<p>To stabilize this situation, we can explicitly define which ABI we want <code>rustc</code> to use for a function. This is done by using the <a href="https://doc.rust-lang.org/reference/items/functions.html#extern-function-qualifier"><code>extern</code></a> keyword. One long-standing choice for inter-language function calls is the <a href="https://github.com/WebAssembly/tool-conventions/blob/main/BasicCABI.md">C ABI</a>, which we will use here. The C ABI won’t change, so we can be sure that our WebAssembly module interface won’t change either.</p>
+<pre><code><span class="diff same"><span class="token attribute attr-name">#[no_mangle]</span></span>
+<span class="diff removed">pub fn add(left: usize, right: usize) -&gt; usize {</span>
+<span class="diff added"><span class="token keyword">pub</span> <span class="token keyword">extern</span> <span class="token string">"C"</span> <span class="token keyword">fn</span> <span class="token function-definition function">add</span><span class="token punctuation">(</span>left<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">,</span> right<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">usize</span> <span class="token punctuation">{</span></span>
+<span class="diff same">    left <span class="token operator">+</span> right
+<span class="token punctuation">}</span></span></code></pre><p>We could even omit the <code>"C"</code> and just use <code>extern</code>, as the C ABI is the default alternative ABI.</p>
+<h3>Importing</h3>
+<p>One important part of WebAssembly is its sandbox. It ensures that the code running in the WebAssembly VM gets no access to anything in the host environment apart from the functions that were explicitly passed into the sandbox via the imports object.</p>
+<p>Let’s say we want to generate random numbers in our Rust code. We could pull in the <code>rand</code> Rust crate, but why ship code for something if there is already something in the host environment. As a first step, we need to declare that our WebAssembly module expects an import:</p>
+<pre><code><span class="diff added"><span class="token attribute attr-name">#[link(wasm_import_module = <span class="token string">"Math"</span>)]</span>
+<span class="token keyword">extern</span> <span class="token string">"C"</span> <span class="token punctuation">{</span>
+    <span class="token keyword">fn</span> <span class="token function-definition function">random</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">f64</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span></span>
+<span class="diff same">
+<span class="token attribute attr-name">#[export_name = <span class="token string">"add"</span>]</span>
+<span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">add</span><span class="token punctuation">(</span>left<span class="token punctuation">:</span> <span class="token keyword">f64</span><span class="token punctuation">,</span> right<span class="token punctuation">:</span> <span class="token keyword">f64</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">f64</span> <span class="token punctuation">{</span></span>
+<span class="diff removed">    left + right  </span>
+<span class="diff added">    left <span class="token operator">+</span> right <span class="token operator">+</span> <span class="token keyword">unsafe</span> <span class="token punctuation">{</span> <span class="token function">random</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">}</span></span>
+<span class="diff same"><span class="token punctuation">}</span></span></code></pre><p><code>extern "C"</code> <em>blocks</em> (not to be confused with the <code>extern "C"</code> <em>functions</em> above) declare functions that the compiler expects to provided by ”someone else” at link time. This is usually how you link against C libraries in Rust, but the mechanism works for WebAssembly as well. However, external functions are always implicitly unsafe, as the compiler can’t make any safety guarantees for non-Rust functions. As a result, we can’t call them unless we wrap invocations in <code>unsafe { ... }</code> blocks.</p>
+<p>The code above will <em>compile</em>, but it won’t run. Our JavaScript code throws an error and needs to be updated to satisfy the imports we have specified. The imports <em>object</em> is a dictionary of import <em>modules</em>, each being a dictionary of import <em>items</em>. In our Rust code we declared an import module with the name <code>"Math"</code>, and expect a function called <code>"random"</code> to be present in that module. These values have of course been carefully chosen so that we can just pass in the entire <code>Math</code> object.</p>
+<pre><code class="language-js">  <span class="token keyword">const</span> importObj <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token literal-property property">Math</span><span class="token operator">:</span> <span class="token punctuation">{</span>
+      <span class="token function-variable function">random</span><span class="token operator">:</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=&gt;</span> Math<span class="token punctuation">.</span><span class="token function">random</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+    <span class="token punctuation">}</span>
+  <span class="token punctuation">}</span><span class="token punctuation">;</span>
+
+  <span class="token comment">// or</span>
+  
+  <span class="token keyword">const</span> importObj <span class="token operator">=</span> <span class="token punctuation">{</span> Math <span class="token punctuation">}</span><span class="token punctuation">;</span>
+</code></pre>
+<p>To avoid having to sprinkle <code>unsafe { ... }</code> everywhere, it is often desirable to write wrapper functions that restore the safety invariants of Rust. This is a good use-case for Rust’s inline modules:</p>
+<pre><code class="language-rust">
+<span class="token keyword">mod</span> <span class="token module-declaration namespace">math</span> <span class="token punctuation">{</span>
+    <span class="token keyword">mod</span> <span class="token module-declaration namespace">math_js</span> <span class="token punctuation">{</span>
+        <span class="token attribute attr-name">#[link(wasm_import_module = <span class="token string">"Math"</span>)]</span>
+        <span class="token keyword">extern</span> <span class="token string">"C"</span> <span class="token punctuation">{</span>
+            <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">random</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">f64</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">pub</span> <span class="token keyword">fn</span> <span class="token function-definition function">random</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">f64</span> <span class="token punctuation">{</span>
+        <span class="token keyword">unsafe</span> <span class="token punctuation">{</span> <span class="token namespace">math_js<span class="token punctuation">::</span></span><span class="token function">random</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token attribute attr-name">#[export_name = <span class="token string">"add"</span>]</span>
+<span class="token keyword">pub</span> <span class="token keyword">extern</span> <span class="token string">"C"</span> <span class="token keyword">fn</span> <span class="token function-definition function">add</span><span class="token punctuation">(</span>left<span class="token punctuation">:</span> <span class="token keyword">f64</span><span class="token punctuation">,</span> right<span class="token punctuation">:</span> <span class="token keyword">f64</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">f64</span> <span class="token punctuation">{</span>
+    left <span class="token operator">+</span> right <span class="token operator">+</span> <span class="token namespace">math<span class="token punctuation">::</span></span><span class="token function">random</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>By the way, if we hadn’t specified the <code>#[link(wasm_import_module = ...)]</code> attribute, the functions will be expected on the default <code>env</code> module. Also, just like you can change the name a function is exported with using <code>#[export_name = "..."]</code>, you can change the name a function is imported under by using <code>#[link_name = "..."]</code>.</p>
+<h3>Higher-level types</h3>
+<p>I said earlier that for functions at the module boundary, it is best to stick to value types that map cleanly to the data types that WebAssembly supports. Of course, the compiler does allow you to use higher-level types as function parameters and return values. What the compiler emits in those cases is defined in the <a href="https://github.com/WebAssembly/tool-conventions/blob/main/BasicCABI.md">C ABI</a> (apart from <a href="https://github.com/rustwasm/team/issues/291">a bug</a> where <code>rustc</code> currently doesn’t fully adhere to the C ABI).</p>
+<p>Without going into too much detail, sized types (like structs, enums, etc) are turned into a simple pointer. Arrays and Tuples, which are both sized types, get special treatment and are converted to an immediate value if they use less then 32 bits. Things get even more complicated if we look at function return values: If you return an array type bigger than 32 bits, the function will get <em>no</em> return value and instead will get an additional function parameter of type <code>i32</code>, which the function will use a pointer to a place to store the result. If a function returns a tuple, it will always turn into a function parameter, regardless of the tuple’s size.</p>
+<p>A function parameter with an unsized type (<code>?Sized</code>), like <code>str</code>, <code>[u8]</code> or <code>dyn MyTrait</code>, is split into two parameters: One value is the pointer to the data, the other value is a pointer to a bit of metadata. In the case of a <code>str</code> or a slice, the metadata is the length of the data. In the case of a trait object, it’s the virtual table (or vtable), which is a list of function pointers to the individual trait function implementations. If you want to know more details about what a VTable in Rust looks like, I can recommend <a href="https://articles.bchlr.de/traits-dynamic-dispatch-upcasting">this article</a> by Thomas Bächler.</p>
+<p>I’m skipping over loads of detail here, because unless you are trying to write the next wasm-bindgen, I would recommmend relying on existing tools rather than reinventing this wheel.</p>
+<h2>Module size</h2>
+<p>When deploying WebAssembly on the web, the size of the WebAssembly binary matters. Every byte needs to go over the network and through the browser’s WebAssembly compiler, so a smaller binary size means less time spent waiting for the user until the WebAssembly starts working. If we build our default project from above as a release build, we get a whopping 1.7MB of WebAssembly. That does not seem right for adding two numbers.</p>
+<blockquote>
+<p><strong>Data sections:</strong> Often, a good chunk of a WebAssembly module is made up of data sections. I.e. static data that gets copied to the linear memory at some point. Those sections are fairly cheap as the compiler just skips them, which is something to keep in mind when analyzing and optimizing module startup time.</p>
+</blockquote>
+<p>A quick way to inspect the innards of a WebAssembly module is <code>llvm-objdump</code> that should be available on your system. Alternatively, you can use <code>wasm-objdump</code> which is part of <a href="https://github.com/WebAssembly/wabt">wabt</a> and generally provides the same interface.</p>
+<pre><code>$ llvm-objdump -h target/wasm32-unknown-unknown/release/my_project.wasm
+
+target/wasm32-unknown-unknown/release/my_project.wasm: file format wasm
+
+Sections:
+Idx Name            Size     VMA      Type
+  0 TYPE            00000007 00000000
+  1 FUNCTION        00000002 00000000
+  2 TABLE           00000005 00000000
+  3 MEMORY          00000003 00000000
+  4 GLOBAL          00000019 00000000
+  5 EXPORT          0000002b 00000000
+  6 CODE            00000009 00000000 TEXT
+  7 .debug_info     00062c72 00000000
+  8 .debug_pubtypes 00000144 00000000
+  9 .debug_ranges   0002af80 00000000
+ 10 .debug_abbrev   00001055 00000000
+ 11 .debug_line     00045d24 00000000
+ 12 .debug_str      0009f40c 00000000
+ 13 .debug_pubnames 0003e3f2 00000000
+ 14 name            0000001c 00000000
+ 15 producers       00000043 00000000
+</code></pre>
+<p><code>llvm-objdump</code> is quite versatile and offers a familiar CLI for people who have experience developing for other ISAs in assembly. However, specifically for debugging binary size, it lacks simple helpers like ordering the sections by size, or breaking the <code>CODE</code> section up by function. Luckily, there is another WebAssembly-specific tool called <a href="https://rustwasm.github.io/twiggy/">Twiggy</a>, that excels at this:</p>
+<pre><code>$ twiggy top target/wasm32-unknown-unknown/release/my_project.wasm
+ Shallow Bytes │ Shallow % │ Item
+───────────────┼───────────┼─────────────────────────────────────────
+        652300 ┊    36.67% ┊ custom section '.debug_str'
+        404594 ┊    22.75% ┊ custom section '.debug_info'
+        285988 ┊    16.08% ┊ custom section '.debug_line'
+        254962 ┊    14.33% ┊ custom section '.debug_pubnames'
+        176000 ┊     9.89% ┊ custom section '.debug_ranges'
+          4181 ┊     0.24% ┊ custom section '.debug_abbrev'
+           324 ┊     0.02% ┊ custom section '.debug_pubtypes'
+            67 ┊     0.00% ┊ custom section 'producers'
+            25 ┊     0.00% ┊ custom section 'name' headers
+            20 ┊     0.00% ┊ custom section '.debug_pubnames' headers
+            19 ┊     0.00% ┊ custom section '.debug_pubtypes' headers
+            18 ┊     0.00% ┊ custom section '.debug_ranges' headers
+            17 ┊     0.00% ┊ custom section '.debug_abbrev' headers
+            16 ┊     0.00% ┊ custom section '.debug_info' headers
+            16 ┊     0.00% ┊ custom section '.debug_line' headers
+            15 ┊     0.00% ┊ custom section '.debug_str' headers
+            14 ┊     0.00% ┊ export "__heap_base"
+            13 ┊     0.00% ┊ export "__data_end"
+            12 ┊     0.00% ┊ custom section 'producers' headers
+             9 ┊     0.00% ┊ export "memory"
+             9 ┊     0.00% ┊ add
+...
+</code></pre>
+<p>It’s now clearly visible that all main contributors to the module size are custom sections, which — by definition — are not relevant to the execution of the module. Their names imply that they contain information that is used for debugging, so the fact that these sections are emitted for a <code>--release</code> build is somewhat surprising. It seems related to a long-standing bug, where <em>our</em> code is compiled without debug symbols, but the pre-compiled standard library on our machine still has debug symbols.</p>
+<p>To address this we add another line to our <code>Cargo.toml</code>:</p>
+<pre><code class="language-toml"><span class="token punctuation">[</span><span class="token table class-name">profile.release</span><span class="token punctuation">]</span>
+<span class="token key property">strip</span> <span class="token punctuation">=</span> <span class="token boolean">true</span>
+</code></pre>
+<p>This will cause <code>rustc</code> to strip all custom sections, including the one that provides function names. This can be undesirable at times because now the output of <code>twiggy</code> will just say <code>code[0]</code> or similar for a function. If you want to keep function names around, we can use a specifc strip mode:</p>
+<pre><code><span class="diff same"><span class="token punctuation">[</span><span class="token table class-name">profile.release</span><span class="token punctuation">]</span></span>
+<span class="diff removed">strip = true</span>
+<span class="diff added"><span class="token key property">strip</span> <span class="token punctuation">=</span> <span class="token string">"debuginfo"</span></span></code></pre><p>If you need super finegrained control, you can go back and disable stripping in <code>rustc</code> altogether and use <code>llvm-strip</code> manually (or <code>wasm-strip</code> from <a href="https://github.com/WebAssembly/wabt">wabt</a>). This allows you control over which custom sections should be kept around.</p>
+<pre><code>$ llvm-strip --keep-section=name target/wasm32-unknown-unknown/release/my_project.wasm
+</code></pre>
+<p>After stripping, we are left with a module of a whopping 116B. Disassembling it shows that the only function in that module is called <code>add</code> and executes <code>(f64.add (local.get 0) (local.get 1))</code>, which means the Rust compiler was able to emit optimal code. Of course, staying on top of binary size gets more complicated with a growing code base.</p>
+<h3>Custom Section</h3>
+<p>Fun fact: We can use Rust to add our own custom sections to a WebAssembly module. If we declare an array of bytes (not a slice!), we can add a <code>#[link_section = ...]</code> attribute to pack those bytes into its own section.</p>
+<pre><code class="language-rust"><span class="token keyword">const</span> _<span class="token punctuation">:</span> <span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span> <span class="token punctuation">{</span>
+    <span class="token attribute attr-name">#[link_section = <span class="token string">"surmsection"</span>]</span>
+    <span class="token keyword">static</span> <span class="token constant">SECTION_CONTENT</span><span class="token punctuation">:</span> <span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">;</span> <span class="token number">11</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token operator">*</span><span class="token string">b"hello world"</span><span class="token punctuation">;</span>
+<span class="token punctuation">}</span><span class="token punctuation">;</span>
+</code></pre>
+<p>And we can extract this data using the <a href="https://developer.mozilla.org/en-US/docs/WebAssembly/JavaScript_interface/Module/customSections"><code>WebAssembly.Module.customSection()</code> API</a> or using <code>llvm-objdump</code>:</p>
+<pre><code>
+$ llvm-objdump -s -j surmsection target/wasm32-unknown-unknown/release/my_project.wasm
+
+target/wasm32-unknown-unknown/release/my_project.wasm: file format wasm
+Contents of section surmsection:
+ 0000 68656c6c 6f20776f 726c64             hello world
+</code></pre>
+<h3>Sneaky bloat</h3>
+<p>I have seen a couple of complaints online about how big WebAssembly modules created by Rust are that do a seemingly small job. In my experience, there are three reasons why WebAssembly binaries created by Rust can be large:</p>
+<ul>
+<li>Debug build (i.e. forgetting to pass <code>--release</code> to <code>Cargo</code>)</li>
+<li>Debug symbols (i.e. forgetting to run <code>llvm-strip</code>)</li>
+<li>Unintentional string formatting and panics</li>
+</ul>
+<p>We have looked at the first two. Let’s take a closer look at the last one. This innocuous program compiles to 18KB of WebAssembly:</p>
+<pre><code class="language-rust"><span class="token keyword">static</span> <span class="token constant">PRIMES</span><span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token punctuation">[</span><span class="token keyword">i32</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token operator">&amp;</span><span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">,</span> <span class="token number">7</span><span class="token punctuation">,</span> <span class="token number">11</span><span class="token punctuation">,</span> <span class="token number">13</span><span class="token punctuation">,</span> <span class="token number">17</span><span class="token punctuation">,</span> <span class="token number">19</span><span class="token punctuation">,</span> <span class="token number">23</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+
+<span class="token attribute attr-name">#[no_mangle]</span>
+<span class="token keyword">extern</span> <span class="token string">"C"</span> <span class="token keyword">fn</span> <span class="token function-definition function">nth_prime</span><span class="token punctuation">(</span>n<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">i32</span> <span class="token punctuation">{</span>
+    <span class="token constant">PRIMES</span><span class="token punctuation">[</span>n<span class="token punctuation">]</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>Okay, maybe not so innocuous after all. You might already know where I’m going with this.</p>
+<h3>Panicking</h3>
+<p>A quick look at <code>twiggy</code> shows that the main contributors to the Wasm module size are functions related to string formatting, panicking and memory allocations. And that makes sense! The parameter <code>n</code> is unsanitized and used to index an array. Rust has no choice but to inject bounds checks. If a bounds check fails, Rust panics, which requires creating a nicely formatted error message and stack trace.</p>
+<p>One way to handle this is to do the bounds checking ourselves. Rust’s compiler is really good at only injecting checks when needed.</p>
+<pre><code><span class="diff same"><span class="token keyword">fn</span> <span class="token function-definition function">nth_prime</span><span class="token punctuation">(</span>n<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">i32</span> <span class="token punctuation">{</span></span>
+<span class="diff added">    <span class="token keyword">if</span> n <span class="token operator">&lt;</span> <span class="token number">0</span> <span class="token operator">||</span> n <span class="token operator">&gt;=</span> <span class="token constant">PRIMES</span><span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">{</span> <span class="token keyword">return</span> <span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">;</span> <span class="token punctuation">}</span></span>
+<span class="diff same">    <span class="token constant">PRIMES</span><span class="token punctuation">[</span>n<span class="token punctuation">]</span>
+<span class="token punctuation">}</span></span></code></pre><p>Arguably more idiomatic would be to lean into <code>Option&lt;T&gt;</code> APIs to control how the error case should be handled:</p>
+<pre><code><span class="diff same"><span class="token keyword">fn</span> <span class="token function-definition function">nth_prime</span><span class="token punctuation">(</span>n<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">i32</span> <span class="token punctuation">{</span></span>
+<span class="diff removed">    PRIMES[n]</span>
+<span class="diff added">    <span class="token constant">PRIMES</span><span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">copied</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap_or</span><span class="token punctuation">(</span><span class="token operator">-</span><span class="token number">1</span><span class="token punctuation">)</span></span>
+<span class="diff same"><span class="token punctuation">}</span></span></code></pre><p>A third way would be to use some of the <code>unchecked</code> methods that Rust explicitly provides. These open the door to undefined behavior and as such are <code>unsafe</code>, but if you are okay carrying the burden to ensure safety, the gain in performance (or file size) can be significant!</p>
+<pre><code><span class="diff same"><span class="token keyword">fn</span> <span class="token function-definition function">nth_prime</span><span class="token punctuation">(</span>n<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">i32</span> <span class="token punctuation">{</span></span>
+<span class="diff removed">    PRIMES[n]</span>
+<span class="diff added">    <span class="token keyword">unsafe</span> <span class="token punctuation">{</span> <span class="token operator">*</span><span class="token constant">PRIMES</span><span class="token punctuation">.</span><span class="token function">get_unchecked</span><span class="token punctuation">(</span>n<span class="token punctuation">)</span> <span class="token punctuation">}</span></span>
+<span class="diff same"><span class="token punctuation">}</span></span></code></pre><p>We can try and stay on top of where we might cause a panic and try to handle those paths manually. However, once we start relying on third-party crates this is less and less likely to succeed, because we can’t easily change how the library does its error handling internally.</p>
+<h3>LTO</h3>
+<p>We’ll probably have to make our peace with the fact that once we can’t avoid having a code path for panics in our code base. While we can try and mitigate the impact of panics (and we will do that!), there is a rather powerful optimization that will often yield some significant code saving. This optimization pass is provided by LLVM and is called <a href="https://llvm.org/docs/LinkTimeOptimization.html">LTO (Link-Time Optimization)</a>. <code>rustc</code> compiles and optimizes each crate, and only then does it link it everything into the final binary. However, there are certain optimizations that only become apparent <em>after</em> linking. For example, many functions have different branches depending on the input. During compile time, you can only see the invocations of the functions from within the same crate. At link time, you know <em>all</em> possible invocations of any given function, which means it might now be possible to eliminate some of these code branches.</p>
+<p>LTO is turned off by default, as it is quite a costly optimization that can slow down compile times significantly, especially in bigger crates. It can be enabled through one of <code>rustc</code>’s many <a href="https://doc.rust-lang.org/rustc/codegen-options/index.html#overflow-checks">codegen options</a>, which you control in the <code>profile</code> section of your <code>Cargo.toml</code>. Specifically, we need to add this line to our <code>Cargo.toml</code> to enable LTO in release builds:</p>
+<pre><code><span class="diff same"><span class="token punctuation">[</span><span class="token table class-name">package</span><span class="token punctuation">]</span>
+<span class="token key property">name</span> <span class="token punctuation">=</span> <span class="token string">"my_project"</span>
+<span class="token key property">version</span> <span class="token punctuation">=</span> <span class="token string">"0.1.0"</span>
+<span class="token key property">edition</span> <span class="token punctuation">=</span> <span class="token string">"2021"</span>
+
+<span class="token punctuation">[</span><span class="token table class-name">lib</span><span class="token punctuation">]</span>
+<span class="token key property">crate-type</span> <span class="token punctuation">=</span> <span class="token punctuation">[</span><span class="token string">"cdylib"</span><span class="token punctuation">]</span>
+</span>
+<span class="diff added"><span class="token punctuation">[</span><span class="token table class-name">profile.release</span><span class="token punctuation">]</span>
+<span class="token key property">lto</span> <span class="token punctuation">=</span> <span class="token boolean">true</span></span></code></pre><p>With LTO enabled, the stripped binary is reduced to 2.3K, which is quite impressive. The only cost of LTO is longer linking times, but if binary size is a concern, LTO should be one of the first levers you make use of as it “only” costs build time and doesn’t require code changes.</p>
+<h3>wasm-opt</h3>
+<p>Another tool that should almost always be a part of your build pipeline is <code>wasm-opt</code> from <a href="https://github.com/WebAssembly/binaryen">binaryen</a>. It is another collection of optimization passes that work purely on the WebAssembly VM instructions, agnostic to the source language they were produced with. Higher-level languages like Rust have more information to work with to apply more sophisticated optimizations, so <code>wasm-opt</code> is not a replacement the optimizations of your language’s compiler. However, it does often manage to shave a couple additional bytes off your module size.</p>
+<pre><code>$ wasm-opt -O3 -o output.wasm target/wasm32-unknown-unknown/my_project.wasm
+</code></pre>
+<p>In our case, <code>wasm-opt</code> reduces Rust’s 2.3K WebAssembly binary a bit further, yielding 2.0K. Pretty good! But rest assured, I won’t stop here. That’s still too large for doing a lookup in an array.</p>
+<h2>No Standard</h2>
+<p>Rust has a <a href="https://docs.rs/std">standard library</a>, which contains a lot of abstractions and utilities that you need on a daily basis when you do systems programming: accessing files, getting the current time, or opening network sockets. It’s all in there for you to use, without having to go searching on <a href="https://crates.io/">crates.io</a> or anything like that. However, many of the data structures and functions make assumptions about the environment that they are used in: They assume that the details of the hardware are abstracted into uniform APIs and they assume that they can somehow allocate (and deallocate) chunks of memory of arbitrary size. Usually, both of these jobs are fulfilled by the operating system, and most of us work atop an operating system on a daily basis.</p>
+<p>However, when you instantiate a WebAssembly module via the raw API, things are different: the sandbox — one of the defining security features of WebAssmebly — isolates the WebAssembly code from the host and, by extension, the operating system. Your code gets access to nothing more than a chunk of linear memory, which isn’t even managed to figure out which parts are in use and which parts are up for grabs.</p>
+<blockquote>
+<p><strong>WASI:</strong> This is not part of this article, but just like WebAssembly is an abstraction for the processor your code is running on, <a href="https://wasi.dev/">WASI</a> (WebAssembly Systems Interface) aims to be an abstraction for the operating system your code is running on and give you a single, uniform API to work with regardless of environment. Rust has support for WASI, although WASI itself is still in development.</p>
+</blockquote>
+<p>This means that Rust gave us a false sense of security! It provided us with an entire standard library with no operating system to back it with. In fact, many of the stdlib modules are just <a href="https://github.com/rust-lang/rust/blob/0d32c8f2ce10710b6560dcb75f32f79c378410d0/library/std/src/sys/wasm/mod.rs#L26-L27">aliased</a> to fail. That means all functions that return a <code>Result&lt;T&gt;</code> always return <code>Err</code>, and all other functions <code>panic</code>.</p>
+<h3>Learning from os-less devices</h3>
+<p>Just a linear chunk of memory. No central entity managing the memory or the periphery. Just arithmetic. That might sound familiar if you have ever worked with embedded systems. While modern embedded systems run Linux nowadays, smaller microprocessors don’t have enough resources to do so. <a href="https://www.rust-lang.org/what/embedded">Rust also targets those hyperconstrained environments</a>, and the <a href="https://docs.rust-embedded.org/book/">Embedded Rust Book</a> as well as the <a href="https://docs.rust-embedded.org/embedonomicon/">Embedonomicon</a> explain how you write Rust correctly for those kinds of environments.</p>
+<p>To enter the world of bare metal 🤘, we have to add a single line to our code: <code>#![no_std]</code>. This crate macro tells Rust to not link against the standard library. Instead, it only links against <a href="https://docs.rs/core">core</a>. The Embedonomicon <a href="https://docs.rust-embedded.org/embedonomicon/smallest-no-std.html#what-does-no_std-mean">explains</a> what that means quite concisely:</p>
+<blockquote>
+<p>The <code>core</code> crate is a subset of the <code>std</code> crate that makes zero assumptions about the system the program will run on. As such, it provides APIs for language primitives like floats, strings and slices, as well as APIs that expose processor features like atomic operations and SIMD instructions. However it lacks APIs for anything that involves heap memory allocations and I/O.</p>
+<p>For an application, std does more than just providing a way to access OS abstractions. std also takes care of, among other things, setting up stack overflow protection, processing command line arguments and spawning the main thread before a program’s main function is invoked. A #![no_std] application lacks all that standard runtime, so it must initialize its own runtime, if any is required.</p>
+</blockquote>
+<p>This can sound a bit scary, but let’s take it step by step. We start by declaring our panic-y prime number program from above as <code>no_std</code>:</p>
+<pre><code><span class="diff added"><span class="token attribute attr-name">#![no_std]</span></span>
+<span class="diff same"><span class="token keyword">static</span> <span class="token constant">PRIMES</span><span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token punctuation">[</span><span class="token keyword">i32</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token operator">&amp;</span><span class="token punctuation">[</span><span class="token number">2</span><span class="token punctuation">,</span> <span class="token number">3</span><span class="token punctuation">,</span> <span class="token number">5</span><span class="token punctuation">,</span> <span class="token number">7</span><span class="token punctuation">,</span> <span class="token number">11</span><span class="token punctuation">,</span> <span class="token number">13</span><span class="token punctuation">,</span> <span class="token number">17</span><span class="token punctuation">,</span> <span class="token number">19</span><span class="token punctuation">,</span> <span class="token number">23</span><span class="token punctuation">]</span><span class="token punctuation">;</span>
+
+<span class="token attribute attr-name">#[no_mangle]</span>
+<span class="token keyword">extern</span> <span class="token string">"C"</span> <span class="token keyword">fn</span> <span class="token function-definition function">nth_prime</span><span class="token punctuation">(</span>n<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">i32</span> <span class="token punctuation">{</span>
+    <span class="token constant">PRIMES</span><span class="token punctuation">[</span>n<span class="token punctuation">]</span>
+<span class="token punctuation">}</span></span></code></pre><p>Sadly — and this was foreshadowed by the paragraph from the Embedonomicon — as we haven’t provided some of the basics that <code>core</code> relies on. At the very top of the list, we need to define what should happen when a panic occurs in this environment. This is done by the aptly named panic handler, and the Embedonomicon gives this as an example:</p>
+<pre><code class="language-rust"><span class="token attribute attr-name">#[panic_handler]</span>
+<span class="token keyword">fn</span> <span class="token function-definition function">panic</span><span class="token punctuation">(</span>_panic<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token namespace">core<span class="token punctuation">::</span>panic<span class="token punctuation">::</span></span><span class="token class-name">PanicInfo</span><span class="token operator">&lt;</span><span class="token lifetime-annotation symbol">'_</span><span class="token operator">&gt;</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token operator">!</span> <span class="token punctuation">{</span>
+    <span class="token keyword">loop</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>This is quite typical for embedded systems, effectively blocking the processor from making any more progress after a panic happened. However, this is not <em>great</em> behavior on the web, so for WebAssembly I usually opt to manually emitting an <code>unreachable</code> instruction, that stops any Wasm VM in its tracks:</p>
+<pre><code><span class="diff same"><span class="token attribute attr-name">#[panic_handler]</span>
+<span class="token keyword">fn</span> <span class="token function-definition function">panic</span><span class="token punctuation">(</span>_panic<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token namespace">core<span class="token punctuation">::</span>panic<span class="token punctuation">::</span></span><span class="token class-name">PanicInfo</span><span class="token operator">&lt;</span><span class="token lifetime-annotation symbol">'_</span><span class="token operator">&gt;</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token operator">!</span> <span class="token punctuation">{</span></span>
+<span class="diff removed">    loop {}</span>
+<span class="diff added">    <span class="token namespace">core<span class="token punctuation">::</span>arch<span class="token punctuation">::</span>wasm32<span class="token punctuation">::</span></span><span class="token function">unreachable</span><span class="token punctuation">(</span><span class="token punctuation">)</span></span>
+<span class="diff same"><span class="token punctuation">}</span></span></code></pre><p>With this in place, our program compiles again. After stripping and <code>wasm-opt</code>, the binary weighs in at 168B. Minimalism wins again!</p>
+<h2>Memory Management</h2>
+<p>Of course, we have given up a lot by going non-standard. Without heap allocations, there is no <code>Box</code>, no <code>Vec</code>, no <code>String</code>, nor many of the other useful things. Luckily, we can get those back without having to provide an entire operating system.</p>
+<p>A lot of what <code>std</code> provides are actually just re-exports from <code>core</code> and from another Rust-internal crate called <code>alloc</code>. <code>alloc</code> contains everything around memory allocations and the data structures that rely on it. By importing it, we can regain access to our trusty <code>Vec</code>.</p>
+<pre><code class="language-rust"><span class="token attribute attr-name">#![no_std]</span>
+<span class="token comment">// One of the few occastions where we have to use `extern crate`</span>
+<span class="token comment">// even in Rust Edition 2021.</span>
+<span class="token keyword">extern</span> <span class="token keyword">crate</span> <span class="token module-declaration namespace">alloc</span><span class="token punctuation">;</span>
+<span class="token keyword">use</span> <span class="token namespace">alloc<span class="token punctuation">::</span>vec<span class="token punctuation">::</span></span><span class="token class-name">Vec</span><span class="token punctuation">;</span>
+
+<span class="token attribute attr-name">#[no_mangle]</span>
+<span class="token keyword">extern</span> <span class="token string">"C"</span> <span class="token keyword">fn</span> <span class="token function-definition function">nth_prime</span><span class="token punctuation">(</span>n<span class="token punctuation">:</span> <span class="token keyword">usize</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">usize</span> <span class="token punctuation">{</span>
+    <span class="token comment">// Please enjoy this horrible implementation of</span>
+    <span class="token comment">// The Sieve of Eratosthenes.</span>
+    <span class="token keyword">let</span> <span class="token keyword">mut</span> primes<span class="token punctuation">:</span> <span class="token class-name">Vec</span><span class="token operator">&lt;</span><span class="token keyword">usize</span><span class="token operator">&gt;</span> <span class="token operator">=</span> <span class="token class-name">Vec</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+    <span class="token keyword">let</span> <span class="token keyword">mut</span> current <span class="token operator">=</span> <span class="token number">2</span><span class="token punctuation">;</span>
+    <span class="token keyword">while</span> primes<span class="token punctuation">.</span><span class="token function">len</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">&lt;</span> n <span class="token punctuation">{</span>
+        <span class="token keyword">if</span> <span class="token operator">!</span>primes<span class="token punctuation">.</span><span class="token function">iter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">any</span><span class="token punctuation">(</span><span class="token closure-params"><span class="token closure-punctuation punctuation">|</span>prime<span class="token closure-punctuation punctuation">|</span></span> current <span class="token operator">%</span> prime <span class="token operator">==</span> <span class="token number">0</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            primes<span class="token punctuation">.</span><span class="token function">push</span><span class="token punctuation">(</span>current<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token punctuation">}</span>
+        current <span class="token operator">+=</span> <span class="token number">1</span><span class="token punctuation">;</span>
+    <span class="token punctuation">}</span>
+    primes<span class="token punctuation">.</span><span class="token function">into_iter</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">last</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">unwrap_or</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span>
+
+<span class="token attribute attr-name">#[panic_handler]</span>
+<span class="token keyword">fn</span> <span class="token function-definition function">panic</span><span class="token punctuation">(</span>_panic<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token namespace">core<span class="token punctuation">::</span>panic<span class="token punctuation">::</span></span><span class="token class-name">PanicInfo</span><span class="token operator">&lt;</span><span class="token lifetime-annotation symbol">'_</span><span class="token operator">&gt;</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token operator">!</span> <span class="token punctuation">{</span>
+    <span class="token namespace">core<span class="token punctuation">::</span>arch<span class="token punctuation">::</span>wasm32<span class="token punctuation">::</span></span><span class="token function">unreachable</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>Trying to compile this will fail, of course - we haven’t actually told Rust what our memory management looks like, and <code>Vec</code> needs to know that to function.</p>
+<pre><code>
+$ cargo build --target=wasm32-unknown-unknown --release
+error: no global memory allocator found but one is required; 
+  link to std or add `#[global_allocator]` to a static item that implements 
+  the GlobalAlloc trait
+
+error: `#[alloc_error_handler]` function required, but not found
+
+note: use `#![feature(default_alloc_error_handler)]` for a default error handler
+</code></pre>
+<p>At the time of writing, in Rust 1.67, you need to provide an error handler that gets invoked when an allocation fails. In the next release, Rust 1.68, <code>default_alloc_error_handler</code> has been stabilized, which means every  non-standard Rust program will come with a default implementation of that error handler. If you want to provide your own error handler anyway, you can:</p>
+<pre><code class="language-rust"><span class="token attribute attr-name">#[alloc_error_handler]</span>
+<span class="token keyword">fn</span> <span class="token function-definition function">alloc_error</span><span class="token punctuation">(</span>_<span class="token punctuation">:</span> <span class="token namespace">core<span class="token punctuation">::</span>alloc<span class="token punctuation">::</span></span><span class="token class-name">Layout</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token operator">!</span> <span class="token punctuation">{</span>
+    <span class="token namespace">core<span class="token punctuation">::</span>arch<span class="token punctuation">::</span>wasm32<span class="token punctuation">::</span></span><span class="token function">unreachable</span><span class="token punctuation">(</span><span class="token punctuation">)</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p>With this sophisticated error handler in place, we should finally provide a way to do actual memory allocations. Just like in my <a href="https://surma.dev/things/c-to-webassembly">C to WebAssembly article</a>, my custom allocator is going to be a minimal bump allocator, which tend to be fast <em>and</em> small, but can’t free memory. We statically allocate an arena that will function as our heap and keep track of where the “free area” begins. Because we are not using Wasm Threads, I am also going to ignore thread safety.</p>
+<pre><code class="language-rust"><span class="token keyword">use</span> <span class="token namespace">core<span class="token punctuation">::</span>cell<span class="token punctuation">::</span></span><span class="token class-name">UnsafeCell</span><span class="token punctuation">;</span>
+
+<span class="token keyword">const</span> <span class="token constant">ARENA_SIZE</span><span class="token punctuation">:</span> <span class="token keyword">usize</span> <span class="token operator">=</span> <span class="token number">128</span> <span class="token operator">*</span> <span class="token number">1024</span><span class="token punctuation">;</span>
+<span class="token attribute attr-name">#[repr(C, align(32))]</span>
+<span class="token keyword">struct</span> <span class="token type-definition class-name">SimpleAllocator</span> <span class="token punctuation">{</span>
+    arena<span class="token punctuation">:</span> <span class="token class-name">UnsafeCell</span><span class="token operator">&lt;</span><span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">;</span> <span class="token constant">ARENA_SIZE</span><span class="token punctuation">]</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+    head<span class="token punctuation">:</span> <span class="token class-name">UnsafeCell</span><span class="token operator">&lt;</span><span class="token keyword">usize</span><span class="token operator">&gt;</span><span class="token punctuation">,</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">impl</span> <span class="token class-name">SimpleAllocator</span> <span class="token punctuation">{</span>
+    <span class="token keyword">const</span> <span class="token keyword">fn</span> <span class="token function-definition function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token keyword">Self</span> <span class="token punctuation">{</span>
+        <span class="token class-name">SimpleAllocator</span> <span class="token punctuation">{</span>
+            arena<span class="token punctuation">:</span> <span class="token class-name">UnsafeCell</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">[</span><span class="token number">0</span><span class="token punctuation">;</span> <span class="token constant">ARENA_SIZE</span><span class="token punctuation">]</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+            head<span class="token punctuation">:</span> <span class="token class-name">UnsafeCell</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token number">0</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+
+<span class="token keyword">unsafe</span> <span class="token keyword">impl</span> <span class="token class-name">Sync</span> <span class="token keyword">for</span> <span class="token class-name">SimpleAllocator</span> <span class="token punctuation">{</span><span class="token punctuation">}</span>
+
+<span class="token attribute attr-name">#[global_allocator]</span>
+<span class="token keyword">static</span> <span class="token constant">ALLOCATOR</span><span class="token punctuation">:</span> <span class="token class-name">SimpleAllocator</span> <span class="token operator">=</span> <span class="token class-name">SimpleAllocator</span><span class="token punctuation">::</span><span class="token function">new</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+</code></pre>
+<p>The <code>#[global_allocator]</code> marks a global variable as the entity that manages the heap. The type of this variable must implement the <a href="https://doc.rust-lang.org/stable/core/alloc/trait.GlobalAlloc.html"><code>GlobalAlloc</code> trait</a>. The methods on the <code>GlobalAlloc</code> trait all use <code>&amp;self</code>, so if you want to modify any values inside the data type, you have to use interior mutability. I opted for <code>UnsafeCell</code> here. Using <code>UnsafeCell</code> makes our struct implicitly <code>!Sync</code>, which Rust doesn’t allow for global static variables. That’s why we also have to manually implement the <code>Sync</code> trait to tell Rust that we know that we are responsible to make this data type thread safe (and we are totally ignoring that).</p>
+<p>The reason the struct is marked as <code>#[repr(C)]</code> is solely so we can manually specify an alignment value. This way we can ensure that even the very first byte in our arena (and by extension the first pointer we return) has an alignment of 32, which should satisfy most data structures.</p>
+<p>Now for the actual implementation of the <code>GlobalAlloc</code> trait:</p>
+<pre><code class="language-rust"><span class="token keyword">unsafe</span> <span class="token keyword">impl</span> <span class="token class-name">GlobalAlloc</span> <span class="token keyword">for</span> <span class="token class-name">SimpleAllocator</span> <span class="token punctuation">{</span>
+    <span class="token keyword">unsafe</span> <span class="token keyword">fn</span> <span class="token function-definition function">alloc</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> layout<span class="token punctuation">:</span> <span class="token class-name">Layout</span><span class="token punctuation">)</span> <span class="token punctuation">-&gt;</span> <span class="token operator">*</span><span class="token keyword">mut</span> <span class="token keyword">u8</span> <span class="token punctuation">{</span>
+        <span class="token keyword">let</span> size <span class="token operator">=</span> layout<span class="token punctuation">.</span><span class="token function">size</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token keyword">let</span> align <span class="token operator">=</span> layout<span class="token punctuation">.</span><span class="token function">align</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+
+        <span class="token comment">// Find the next address that has the right alignment.</span>
+        <span class="token keyword">let</span> idx <span class="token operator">=</span> <span class="token punctuation">(</span><span class="token operator">*</span><span class="token keyword">self</span><span class="token punctuation">.</span>head<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">.</span><span class="token function">next_multiple_of</span><span class="token punctuation">(</span>align<span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// Bump the head to the next free byte</span>
+        <span class="token operator">*</span><span class="token keyword">self</span><span class="token punctuation">.</span>head<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span> <span class="token operator">=</span> idx <span class="token operator">+</span> size<span class="token punctuation">;</span>
+        <span class="token keyword">let</span> arena<span class="token punctuation">:</span> <span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token punctuation">[</span><span class="token keyword">u8</span><span class="token punctuation">;</span> <span class="token constant">ARENA_SIZE</span><span class="token punctuation">]</span> <span class="token operator">=</span> <span class="token operator">&amp;</span><span class="token keyword">mut</span> <span class="token punctuation">(</span><span class="token operator">*</span><span class="token keyword">self</span><span class="token punctuation">.</span>arena<span class="token punctuation">.</span><span class="token function">get</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">)</span><span class="token punctuation">;</span>
+        <span class="token comment">// If we ran out of arena space, we return a null pointer, which</span>
+        <span class="token comment">// signals a failed allocation.</span>
+        <span class="token keyword">match</span> arena<span class="token punctuation">.</span><span class="token function">get_mut</span><span class="token punctuation">(</span>idx<span class="token punctuation">)</span> <span class="token punctuation">{</span>
+            <span class="token class-name">Some</span><span class="token punctuation">(</span>item<span class="token punctuation">)</span> <span class="token operator">=&gt;</span> item <span class="token keyword">as</span> <span class="token operator">*</span><span class="token keyword">mut</span> <span class="token keyword">u8</span><span class="token punctuation">,</span>
+            _ <span class="token operator">=&gt;</span> <span class="token namespace">core<span class="token punctuation">::</span>ptr<span class="token punctuation">::</span></span><span class="token function">null_mut</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token punctuation">,</span>
+        <span class="token punctuation">}</span>
+    <span class="token punctuation">}</span>
+
+    <span class="token keyword">unsafe</span> <span class="token keyword">fn</span> <span class="token function-definition function">dealloc</span><span class="token punctuation">(</span><span class="token operator">&amp;</span><span class="token keyword">self</span><span class="token punctuation">,</span> _ptr<span class="token punctuation">:</span> <span class="token operator">*</span><span class="token keyword">mut</span> <span class="token keyword">u8</span><span class="token punctuation">,</span> _layout<span class="token punctuation">:</span> <span class="token class-name">Layout</span><span class="token punctuation">)</span> <span class="token punctuation">{</span>
+        <span class="token comment">/* lol */</span>
+    <span class="token punctuation">}</span>
+<span class="token punctuation">}</span>
+</code></pre>
+<p><code>#[global_allocator]</code> is not limited to <code>#[no_std]</code>! You can also use it override Rust’s default allocator and replace it with your own, as Rust’s default allocator consumes about 10K of Wasm space.</p>
+<h3>wee_alloc</h3>
+<p>You don’t have to implement the allocator yourself, of course. In fact, it’s probably advisable to rely on a well-tested implementation. Dealing with bugs in the allocator and subtle memory corruption is not fun.</p>
+<p>Many guides recommend <a href="https://crates.io/crates/wee_alloc"><code>wee_alloc</code></a>, which is a very small (&lt;1KB) allocator written by the Rust WebAssembly team that can also free memory. Sadly, it seems unmaintained and has an <a href="https://github.com/rustwasm/wee_alloc/issues/105">open issue about memory corruption</a> and leaking memory.</p>
+<p>In any WebAssembly module of decent complexity, the 10KB consumed by Rust’s defaul allocator will make up for only a tiny fraction of the overall module size, so I recommend sticking to it and knowing that the allocator is well-tested and performant.</p>
+<h2>wasm-bindgen</h2>
+<p>Now that we’ve done pretty much everything the hard way, we have earned a look at the convenient way of writing Rust for WebAssembly, which is using <a href="https://rustwasm.github.io/wasm-bindgen/">wasm-bindgen</a>.</p>
+<p>They key feature of wasm-bindgen is the <code>#[wasm_bindgen]</code> macro that we can put on every function that we want to export. This macro adds the same compiler directives we added manually earlier in this article, but it does something way more useful in addition to that:</p>
+<p>For example, if we add the macro to our <code>add</code> function from above, it emits another function called <code>__wbindgen_describe_add</code> that returns a description of our <code>add</code> function in a <a href="https://github.com/rustwasm/wasm-bindgen/blob/main/crates/cli-support/src/descriptor.rs">numeric format</a>. Concretely, the descriptor of our <code>add</code> function looks like this:</p>
+<pre><code>Function(
+    Function {
+        arguments: [
+            U32,
+            U32,
+        ],
+        shim_idx: 0,
+        ret: U32,
+        inner_ret: Some(
+            U32,
+        ),
+    },
+)
+</code></pre>
+<p>This is quite the simple function, but the descriptors in wasm-bindgen are capable of representing quite complex function signatures.</p>
+<blockquote>
+<p><strong>Expand:</strong> If you want to see what code the <code>#[wasm_bindgen]</code> macro emits, use rust-analyzer’s “Expand Macro recursively” functionality. You can run it via VS Code through the Command Palette.</p>
+</blockquote>
+<p>What are these descriptors used for? wasm-bindgen does not just provide a macro, it also comes with a CLI we can use to post-process our Wasm binary. The CLI extracts those descriptors and uses the information to generate tailor-made JavaScript bindings (and then removes all these descriptor functions as they are no longer needed). The generated JavaScript has all the routines to deal with higher-level types, allowing you to seamlessly pass types like strings, <code>ArrayBuffer</code> or even closures.</p>
+<p>If you want to write Rust for WebAssembly, I recommend using wasm-bindgen. wasm-bindgen doesn’t work with <code>#![no_std]</code>, but in practice that is rarely a problem.</p>
+<h2>wasm-pack</h2>
+<p>I also quickly want to mention <a href="https://rustwasm.github.io/wasm-pack/">wasm-pack</a>, which is another Rust tool for WebAssembly. We have used a whole battery of tools to compile and process our WebAssembly to optimize the end result. <code>wasm-pack</code> is a tool that codifies most of these processes. It can bootstrap a new Rust project where all settings are optimized for WebAssembly. It can build the project and will invoke <code>cargo</code> with all the right flags, then it invokes the <code>wasm-bindgen</code> CLI to generate bindings and finally it will run <code>wasm-opt</code> to make sure we are not leaving any performance on the table. <code>wasm-pack</code> is also able to prepare your WebAssembly module for publishing to npm, but I have personally never used that functionality.</p>
+<h2>Conclusion</h2>
+<p>Rust is a great language to target WebAssembly. With LTO enabled, you can get extremely small modules. The WebAssembly tooling for Rust is excellent and has gotten a lot better since I worked with it for the first time in <a href="https://squoosh.app/">Squoosh</a>. The glue code that <code>wasm-bindgen</code> emits is both modern and tree-shaken.</p>
+<p>I had a lot of fun learning about how it all works under the hood and it helped me understand and appreciate what all the tools are doing for me. I hope you feel similarly.</p>
+<p>Massive thanks to <a href="https://twitter.com/opinionatedpie">Ingrid</a>, <a href="https://twitter.com/rreverser">Ingvar</a> and <a href="https://twitter.com/saulecabrera/">Saul</a> for reviewing this article.</p>
+
+</main>
+<footer>
+  <div class="arrows">
+    <div class="arrow yellow"></div>
+    <div class="arrow orange"></div>
+    <div class="arrow red"></div>
+    <div class="arrow pink"></div>
+    <div class="arrow purple"></div>
+    <div class="arrow lightblue"></div>
+    <div class="arrow blue"></div>
+  </div>
+  
+  <a href="https://surma.dev/" class="back">← Back to home</a>
+  
+  <section class="me">
+    <img src="./Rust to WebAssembly the hard way — surma.dev_files/surma.1bdb48ee.jpg" class="avatar">
+    <div class="bio">
+      <h3 class="name">
+        Surma
+      </h3>
+      <p class="info">
+        DX at Shopify. Web Platform Advocate.<br>Craving simplicity, finding it nowhere.<br>“A bit of a ‘careless eager student’ archetype” according to HN.<br>Internetrovert 🏳️‍🌈 He/him.
+      </p>
+    </div>
+    
+    <span class="icon social_twitter">
+      <a href="https://twitter.com/dassurma" rel="me">
+        twitter
+      </a>
+    </span>
+    
+    <span class="icon social_mastodon">
+      <a href="https://toot.cafe/@surma" rel="me">
+        mastodon
+      </a>
+    </span>
+    
+    <span class="icon social_github">
+      <a href="https://github.com/surma" rel="me">
+        github
+      </a>
+    </span>
+    
+    <span class="icon social_instagram">
+      <a href="https://instagram.com/dassurma" rel="me">
+        instagram
+      </a>
+    </span>
+    
+    <span class="icon social_keybase">
+      <a href="https://keybase.io/surma" rel="me">
+        keybase
+      </a>
+    </span>
+    
+    <span class="icon social_podcast">
+      <a href="https://http203.libsyn.com/" rel="me">
+        podcast
+      </a>
+    </span>
+    
+    <span class="icon social_rss">
+      <a href="https://surma.dev/index.xml" rel="me">
+        rss
+      </a>
+    </span>
+    
+    <a class="licenses" href="https://surma.dev/licenses/">Licenses</a>
+  </section>
+</footer>
+
+<script>
+  self._ga = {
+    // Full Measurement Protocol param reference:
+    // https://developers.google.com/analytics/devguides/collection/protocol/v1/parameters
+    data: {
+      v: "1", // Measurement Protocol version.
+      tid: "UA-69989029-1", // Tracking ID.
+      cid: `${Date.now()}${Math.random()}`, // Client ID.
+      dl: location.href, // Document location.
+      aip: 1, // Anonymize IP
+    },
+    send(additionalParams) {
+      navigator.sendBeacon(
+        "https://google-analytics.com/collect",
+        new URLSearchParams({
+          ...this.data,
+          ...additionalParams,
+        }).toString()
+      );
+    },
+  };
+  _ga.send({ t: "pageview" });
+</script>
+
+
+
+
+<div class="noise" style="background-image: url(&quot;blob:https://surma.dev/ae5eda72-e8f8-44fe-b0f5-e87fb6d34976&quot;);"></div></body></html>
