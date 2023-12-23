@@ -1,11 +1,15 @@
-use wasm_bindgen::prelude::*;
+#![no_std]
 
-#[wasm_bindgen]
-extern {
-    pub fn alert(s: &str);
+#[cfg(target_arch="wasm32")]
+use core::panic::PanicInfo;
+
+#[cfg(target_arch="wasm32")]
+#[panic_handler]
+fn panic(_panic: &PanicInfo<'_>) -> ! {
+    loop {}
 }
 
-#[wasm_bindgen]
-pub fn greet(name: &str) {
-    alert(&format!("Hello, {}!", name));
+//#[no_mangle]
+pub fn add(a: u32, b: u32) -> u32 {
+    a + b
 }
