@@ -1,11 +1,11 @@
 #![no_std]
 
-#[cfg(target_arch="wasm32")]
+#[cfg(target_arch = "wasm32")]
 use core::panic::PanicInfo;
 
 use wasm_macro::return_as_is;
 
-#[cfg(target_arch="wasm32")]
+#[cfg(target_arch = "wasm32")]
 #[panic_handler]
 fn panic(_panic: &PanicInfo<'_>) -> ! {
     loop {}
