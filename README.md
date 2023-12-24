@@ -12,5 +12,6 @@ Experiments with Rust and WASM
 
 ## Rust Embedded
 
+- The rustc book > [Symbol Mangling](https://doc.rust-lang.org/rustc/symbol-mangling/index.html#symbol-mangling)
 - [Rust to WebAssembly the hard way](https://surma.dev/things/rust-to-webassembly/)
 - [The embedonomicon](https://docs.rust-embedded.org/embedonomicon/)

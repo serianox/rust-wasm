@@ -9,7 +9,14 @@ fn panic(_panic: &PanicInfo<'_>) -> ! {
     loop {}
 }
 
-//#[no_mangle]
-pub fn add(a: u32, b: u32) -> u32 {
+#[return_as_is]
+#[export_name = "00"]
+pub fn add(a: u16, b: u16) -> u16 {
     a + b
+}
+
+#[return_as_is]
+#[export_name = "01"]
+pub fn mul(a: u16, b: u16) -> u32 {
+    (a * b) as u32
 }
