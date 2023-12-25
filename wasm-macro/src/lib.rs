@@ -1,5 +1,6 @@
 use proc_macro::TokenStream;
 use quote::quote;
+use sha3::{Digest, Sha3_256};
 use syn::{parse_macro_input, ItemFn};
 
 #[proc_macro_attribute]
@@ -11,7 +12,10 @@ pub fn custom_mangle(_attr: TokenStream, item: TokenStream) -> TokenStream {
     let output = &function.sig.output;
     let block = &function.block;
 
-    let name_token = format!("__{name}");
+    let binding = Sha3_256::digest(name.to_string());
+    let name_hash: &[u8] = &binding.as_slice()[..4];
+    let name_hash_to_hex_string: String = hex::encode(name_hash);
+    let name_token = format!("__${name_hash_to_hex_string}");
 
     let expanded = quote! {
         #[export_name = #name_token]
