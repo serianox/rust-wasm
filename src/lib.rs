@@ -1,36 +1,28 @@
 #![no_std]
 
-#[cfg(target_arch = "wasm32")]
-use core::panic::PanicInfo;
-
 use wasm_macro::custom_mangle;
 
+use wasm_bindgen::prelude::*;
+
+#[wasm_bindgen]
+extern "C" {
+    fn alert(s: &str);
+}
+
 #[cfg(target_arch = "wasm32")]
-#[panic_handler]
-fn panic(_panic: &PanicInfo<'_>) -> ! {
+//#[panic_handler]
+#[allow(dead_code)]
+fn panic(_panic: &core::panic::PanicInfo<'_>) -> ! {
+    alert("");
     unsafe { core::hint::unreachable_unchecked() }
 }
 
 #[custom_mangle]
-pub fn install(parameters: u16) -> ! {
+pub fn install(_parameters: u16) -> ! {
     unsafe { core::hint::unreachable_unchecked() }
 }
 
 #[custom_mangle]
-pub fn process(a: u16, b: u16) -> ! {
+pub fn process(_a: u16, _b: u16) -> ! {
     unsafe { core::hint::unreachable_unchecked() }
-}
-
-#[custom_mangle]
-pub fn add(a: u16, b: u16) -> u16 {
-    inner(a, 0 - b)
-}
-
-#[custom_mangle]
-pub fn mul(a: u16, b: u16) -> u32 {
-    (a * b) as u32
-}
-
-fn inner(a: u16, b: u16) -> u16 {
-    a - b
 }
